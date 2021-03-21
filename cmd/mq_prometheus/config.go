@@ -21,6 +21,7 @@ package main
 import (
 	"flag"
 	"fmt"
+
 	cf "github.com/ibm-messaging/mq-metric-samples/v5/pkg/config"
 )
 
@@ -67,12 +68,12 @@ func initConfig() error {
 
 	cf.InitConfig(&config.cf)
 
-	flag.StringVar(&config.httpListenPort, "ibmmq.httpListenPort", defaultPort, "HTTP Listener Port")
-	flag.StringVar(&config.httpListenHost, "ibmmq.httpListenHost", "", "HTTP Listener Hose")
+	cf.StringVarOrEnv(&config.httpListenPort, "ibmmq.httpListenPort", defaultPort, "HTTP Listener Port")
+	cf.StringVarOrEnv(&config.httpListenHost, "ibmmq.httpListenHost", "", "HTTP Listener Host")
 
-	flag.StringVar(&config.httpMetricPath, "ibmmq.httpMetricPath", "/metrics", "Path to exporter metrics")
+	cf.StringVarOrEnv(&config.httpMetricPath, "ibmmq.httpMetricPath", "/metrics", "Path to exporter metrics")
 
-	flag.StringVar(&config.namespace, "namespace", defaultNamespace, "Namespace for metrics")
+	cf.StringVarOrEnv(&config.namespace, "namespace", defaultNamespace, "Namespace for metrics")
 
 	flag.Parse()
 

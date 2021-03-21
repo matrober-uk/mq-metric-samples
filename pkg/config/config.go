@@ -24,9 +24,13 @@ package config
 import (
 	"flag"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/ibm-messaging/mq-golang/v5/mqmetric"
 	log "github.com/sirupsen/logrus"
-	"time"
 )
 
 // Configuration attributes shared by all the monitor sample programs
@@ -71,50 +75,99 @@ const (
 )
 
 func InitConfig(cm *Config) {
-	flag.StringVar(&cm.LogLevel, "log.level", "error", "Log level - debug, info, error")
+	StringVarOrEnv(&cm.LogLevel, "log.level", "error", "Log level - debug, info, error")
 
-	flag.StringVar(&cm.QMgrName, "ibmmq.queueManager", "", "Queue Manager name")
-	flag.StringVar(&cm.CC.CcdtUrl, "ibmmq.ccdtUrl", "", "Path to CCDT")
-	flag.StringVar(&cm.CC.ConnName, "ibmmq.connName", "", "Connection Name")
-	flag.StringVar(&cm.CC.Channel, "ibmmq.channel", "", "Channel Name")
-	flag.StringVar(&cm.ReplyQ, "ibmmq.replyQueue", "SYSTEM.DEFAULT.MODEL.QUEUE", "Reply Queue to collect data")
+	StringVarOrEnv(&cm.QMgrName, "ibmmq.queueManager", "", "Queue Manager name")
+	StringVarOrEnv(&cm.CC.CcdtUrl, "ibmmq.ccdtUrl", "", "Path to CCDT")
+	StringVarOrEnv(&cm.CC.ConnName, "ibmmq.connName", "", "Connection Name")
+	StringVarOrEnv(&cm.CC.Channel, "ibmmq.channel", "", "Channel Name")
+	StringVarOrEnv(&cm.ReplyQ, "ibmmq.replyQueue", "SYSTEM.DEFAULT.MODEL.QUEUE", "Reply Queue to collect data")
 
-	flag.StringVar(&cm.MetaPrefix, "metaPrefix", "", "Override path to monitoring resource topic")
+	StringVarOrEnv(&cm.MetaPrefix, "metaPrefix", "", "Override path to monitoring resource topic")
 
 	// Note that there are non-empty defaults for Topics and Subscriptions
-	flag.StringVar(&cm.MonitoredQueues, "ibmmq.monitoredQueues", "", "Patterns of queues to monitor")
-	flag.StringVar(&cm.MonitoredQueuesFile, "ibmmq.monitoredQueuesFile", "", "File with patterns of queues to monitor")
-	flag.StringVar(&cm.MonitoredChannels, "ibmmq.monitoredChannels", "", "Patterns of channels to monitor")
-	flag.StringVar(&cm.MonitoredChannelsFile, "ibmmq.monitoredChannelsFile", "", "File with patterns of channels to monitor")
-	flag.StringVar(&cm.MonitoredTopics, "ibmmq.monitoredTopics", "#", "Patterns of topics to monitor")
-	flag.StringVar(&cm.MonitoredTopicsFile, "ibmmq.monitoredTopicsFile", "", "File with patterns of topics to monitor")
-	flag.StringVar(&cm.MonitoredSubscriptions, "ibmmq.monitoredSubscriptions", "*", "Patterns of subscriptions to monitor")
-	flag.StringVar(&cm.MonitoredSubscriptionsFile, "ibmmq.monitoredSubscriptionsFile", "", "File with patterns of subscriptions to monitor")
-	flag.StringVar(&cm.QueueSubscriptionSelector, "ibmmq.queueSubscriptionSelector", "", "Resource topic selection for queues")
-	flag.BoolVar(&cm.CC.ShowInactiveChannels, "ibmmq.showInactiveChannels", false, "Show inactive channels (not just stopped ones)")
+	StringVarOrEnv(&cm.MonitoredQueues, "ibmmq.monitoredQueues", "", "Patterns of queues to monitor")
+	StringVarOrEnv(&cm.MonitoredQueuesFile, "ibmmq.monitoredQueuesFile", "", "File with patterns of queues to monitor")
+	StringVarOrEnv(&cm.MonitoredChannels, "ibmmq.monitoredChannels", "", "Patterns of channels to monitor")
+	StringVarOrEnv(&cm.MonitoredChannelsFile, "ibmmq.monitoredChannelsFile", "", "File with patterns of channels to monitor")
+	StringVarOrEnv(&cm.MonitoredTopics, "ibmmq.monitoredTopics", "#", "Patterns of topics to monitor")
+	StringVarOrEnv(&cm.MonitoredTopicsFile, "ibmmq.monitoredTopicsFile", "", "File with patterns of topics to monitor")
+	StringVarOrEnv(&cm.MonitoredSubscriptions, "ibmmq.monitoredSubscriptions", "*", "Patterns of subscriptions to monitor")
+	StringVarOrEnv(&cm.MonitoredSubscriptionsFile, "ibmmq.monitoredSubscriptionsFile", "", "File with patterns of subscriptions to monitor")
+	StringVarOrEnv(&cm.QueueSubscriptionSelector, "ibmmq.queueSubscriptionSelector", "", "Resource topic selection for queues")
+	BoolVarOrEnv(&cm.CC.ShowInactiveChannels, "ibmmq.showInactiveChannels", false, "Show inactive channels (not just stopped ones)")
 
 	// qStatus was the original flag but prefer to use useStatus as more meaningful for all object types
-	flag.BoolVar(&cm.CC.UseStatus, "ibmmq.qStatus", false, "Add metrics from the QSTATUS fields")
-	flag.BoolVar(&cm.CC.UseStatus, "ibmmq.useStatus", false, "Add metrics from all object STATUS fields")
-	flag.BoolVar(&cm.CC.UsePublications, "ibmmq.usePublications", true, "Use resource publications. Set to false to monitor older Distributed platforms")
-	flag.BoolVar(&cm.CC.UseResetQStats, "ibmmq.resetQStats", false, "Use RESET QSTATS on z/OS queue managers")
+	BoolVarOrEnv(&cm.CC.UseStatus, "ibmmq.qStatus", false, "Add metrics from the QSTATUS fields")
+	BoolVarOrEnv(&cm.CC.UseStatus, "ibmmq.useStatus", false, "Add metrics from all object STATUS fields")
+	BoolVarOrEnv(&cm.CC.UsePublications, "ibmmq.usePublications", true, "Use resource publications. Set to false to monitor older Distributed platforms")
+	BoolVarOrEnv(&cm.CC.UseResetQStats, "ibmmq.resetQStats", false, "Use RESET QSTATS on z/OS queue managers")
 
-	flag.StringVar(&cm.CC.UserId, "ibmmq.userid", "", "UserId for MQ connection")
+	StringVarOrEnv(&cm.CC.UserId, "ibmmq.userid", "", "UserId for MQ connection")
 	// If password is not given on command line (and it shouldn't be) then there's a prompt for stdin
-	flag.StringVar(&cm.CC.Password, "ibmmq.password", "", "Password for MQ connection")
-	flag.BoolVar(&cm.CC.ClientMode, "ibmmq.client", false, "Connect as MQ client")
+	StringVarOrEnv(&cm.CC.Password, "ibmmq.password", "", "Password for MQ connection")
+	BoolVarOrEnv(&cm.CC.ClientMode, "ibmmq.client", false, "Connect as MQ client")
 
-	flag.StringVar(&cm.TZOffsetString, "ibmmq.tzOffset", defaultTZOffset, "Time difference between collector and queue manager")
-	flag.StringVar(&cm.pollInterval, "pollInterval", defaultPollInterval, "Frequency of issuing object status checks")
-	flag.StringVar(&cm.rediscoverInterval, "rediscoverInterval", defaultRediscoverInterval, "Frequency of expanding wildcards for monitored queues")
+	StringVarOrEnv(&cm.TZOffsetString, "ibmmq.tzOffset", defaultTZOffset, "Time difference between collector and queue manager")
+	StringVarOrEnv(&cm.pollInterval, "pollInterval", defaultPollInterval, "Frequency of issuing object status checks")
+	StringVarOrEnv(&cm.rediscoverInterval, "rediscoverInterval", defaultRediscoverInterval, "Frequency of expanding wildcards for monitored queues")
 	// The locale ought to be discoverable from the environment, but making it an explicit config
 	// parameter for now to aid testing, to override, and to ensure it's given in the MQ-known format
 	// such as "Fr_FR"
-	flag.StringVar(&cm.Locale, "locale", "", "Locale for translated metric descriptions")
+	StringVarOrEnv(&cm.Locale, "locale", "", "Locale for translated metric descriptions")
 
 	// A YAML configuration file can be used instead of all the preceding parameters
-	flag.StringVar(&cm.ConfigFile, "f", "", "Configuration file")
+	StringVarOrEnv(&cm.ConfigFile, "f", "", "Configuration file")
 
+}
+
+// Wrapper StringVar so that parameters can also be loaded as environment variables.
+//
+// The CLI parameter names are not compatible with use as environment variable names
+// so we look up the env var by replacing the "." character with an underscore and
+// making it uppercase.
+func StringVarOrEnv(p *string, name string, defaultValue string, usage string) {
+
+	envVarName := GetEnvVarNameForParameter(name)
+	envValue := os.Getenv(envVarName)
+
+	if envValue != "" {
+		// Update the default value to be the environment variable
+		defaultValue = envValue
+	}
+
+	// Define the string var as normal.
+	flag.StringVar(p, name, defaultValue, usage)
+
+}
+
+// Wrapper BoolVar so that parameters can also be loaded as environment variables.
+//
+// The CLI parameter names are not compatible with use as environment variable names
+// so we look up the env var by replacing the "." character with an underscore and
+// making it uppercase.
+func BoolVarOrEnv(p *bool, name string, defaultValue bool, usage string) {
+
+	envVarName := GetEnvVarNameForParameter(name)
+	envValue := os.Getenv(envVarName)
+
+	if envValue != "" {
+		// Update the default value to be the environment variable
+		envValueBool, _ := strconv.ParseBool(envValue)
+		defaultValue = envValueBool
+	}
+
+	// Define the string var as normal.
+	flag.BoolVar(p, name, defaultValue, usage)
+
+}
+
+// Calculate the equivalent environment variable name.
+// e.g. CLI parameter "ibmmq.userid" will be environment variable of "IBMMQ_USERID"
+func GetEnvVarNameForParameter(parameterName string) string {
+	nameWithUnderscore := strings.Replace(parameterName, ".", "_", -1)
+	uppercaseNameWithUScore := strings.ToUpper(nameWithUnderscore)
+	return uppercaseNameWithUScore
 }
 
 func VerifyConfig(cm *Config) error {
